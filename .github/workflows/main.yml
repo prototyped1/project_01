@@ -44,6 +44,18 @@ jobs:
             echo "Bucket does not exist, will create."
           fi
 
+      - name: Cleanup failed CloudFormation stack
+        if: steps.check-bucket.outputs.exists == 'false'
+        run: |
+          STATUS=$(aws cloudformation describe-stacks --stack-name s3-buckets --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+          echo "Stack status: $STATUS"
+          if [ "$STATUS" = "ROLLBACK_COMPLETE" ] || [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "DELETE_FAILED" ]; then
+            echo "Deleting failed stack..."
+            aws cloudformation delete-stack --stack-name s3-buckets
+            aws cloudformation wait stack-delete-complete --stack-name s3-buckets
+            echo "Stack deleted."
+          fi
+
       - name: Deploy S3 Buckets CloudFormation Stacks
         id: s3-buckets
         if: steps.check-bucket.outputs.exists == 'false'
