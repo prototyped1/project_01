@@ -10,7 +10,7 @@ on:
         required: true
         default: "ap-southeast-2"
       bucketName:
-        description: "S3 Bucket Name"
+        description: "S3 Bucket Name (must be globally unique)"
         default: "imba-gwen"
         required: true
 
@@ -33,8 +33,20 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ github.event.inputs.region }} 
 
+      - name: Check if S3 bucket exists
+        id: check-bucket
+        run: |
+          if aws s3api head-bucket --bucket ${{ github.event.inputs.bucketName }} 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Bucket already exists, skipping creation."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Bucket does not exist, will create."
+          fi
+
       - name: Deploy S3 Buckets CloudFormation Stacks
         id: s3-buckets
+        if: steps.check-bucket.outputs.exists == 'false'
         uses: aws-actions/aws-cloudformation-github-deploy@v1
         with:
           name:  s3-buckets
